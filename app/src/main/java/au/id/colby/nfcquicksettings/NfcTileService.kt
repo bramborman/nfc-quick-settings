@@ -44,6 +44,7 @@ class NfcTileService : TileService() {
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "onCreate")
+        if (writeSecureSettingsPermissionGranted == null) writeSecureSettingsPermissionGranted = permissionGranted(WRITE_SECURE_SETTINGS)
         updatePreferencesActivity()
     }
 
@@ -128,17 +129,17 @@ class NfcTileService : TileService() {
      * @return true if the state change was successfully requested, otherwise false.
      */
     private fun setNfcAdapterState(adapter: NfcAdapter, enable: Boolean): Boolean {
-        if (!permissionGranted(WRITE_SECURE_SETTINGS)) return false
-        val methodName = if (enable) "enable" else "disable"
-        Log.i(TAG, "Setting NFC adapter's status to ${methodName}d")
+        if (!writeSecureSettingsPermissionGranted!!) return false
+        val method = if (enable) nfcAdapterEnableMethod else nfcAdapterDisableMethod
+        Log.i(TAG, "Setting NFC adapter's status to ${method.name}d")
         if (enable) updateTile(Tile.STATE_ACTIVE, string.tile_subtitle_turning_on)
         val success = try {
-            Log.d(TAG, "Invoking NfcAdapter::$methodName()")
-            val result = NfcAdapter::class.java.getMethod(methodName).invoke(adapter)
-            Log.d(TAG, "NfcAdapter::$methodName() returned $result")
+            Log.d(TAG, "Invoking NfcAdapter::${method.name}()")
+            val result = method.invoke(adapter)
+            Log.d(TAG, "NfcAdapter::${method.name}() returned $result")
             result is Boolean && result
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to invoke NfcAdapter::$methodName()", e)
+            Log.e(TAG, "Failed to invoke NfcAdapter::${method.name}()", e)
             false
         }
         if (enable && !success) updateTile() // Clear the 'Turning on...' state.
@@ -170,7 +171,7 @@ class NfcTileService : TileService() {
      */
     private fun updatePreferencesActivity() {
         val newState =
-            if (permissionGranted(WRITE_SECURE_SETTINGS)) PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+            if (writeSecureSettingsPermissionGranted!!) PackageManager.COMPONENT_ENABLED_STATE_ENABLED
             else PackageManager.COMPONENT_ENABLED_STATE_DISABLED
         Log.d(TAG, "Setting preferences activity enabled setting to $newState")
         applicationContext.packageManager.setComponentEnabledSetting(
@@ -223,6 +224,10 @@ class NfcTileService : TileService() {
      * Provides static functions for the NfcTileService class.
      */
     companion object {
+        private var writeSecureSettingsPermissionGranted: Boolean? = null
+        private val nfcAdapterEnableMethod by lazy { NfcAdapter::class.java.getMethod("enable") }
+        private val nfcAdapterDisableMethod by lazy { NfcAdapter::class.java.getMethod("disable") }
+
         /**
          * Updates the Quick Settings tile owned by [context], which is an NfcTileService instance.
          */
