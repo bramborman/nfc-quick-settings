@@ -4,11 +4,7 @@ on: [push, pull_request]
 
 jobs:
   build:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-      fail-fast: false
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-java@v4
@@ -17,13 +13,6 @@ jobs:
         java-version: '17'
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
-    - name: Setup Build ID
-      run: |
-        [[ "$MATRIX_OS" == ubuntu* ]] && osName=linux || osName="${MATRIX_OS:0:3}"
-        echo "BUILD_ID=$GITHUB_RUN_NUMBER.$osName" >> "$GITHUB_ENV"
-      shell: bash
-      env:
-        MATRIX_OS: ${{ matrix.os }}
     - name: Setup signing KeyStore
       if: github.event_name == 'push' && github.actor != 'dependabot[bot]'
       run: |
@@ -42,13 +31,11 @@ jobs:
     - name: Prep consolidated build outputs
       run: |
         mkdir -p "$RUNNER_TEMP/build-outputs"
-        mv 'app/build/outputs' "$RUNNER_TEMP/build-outputs/$MATRIX_OS"
+        mv 'app/build/outputs' "$RUNNER_TEMP/build-outputs"
       shell: bash
-      env:
-        MATRIX_OS: ${{ matrix.os }}
     - name: Upload build outputs
       uses: actions/upload-artifact@v4
       with:
-        name: build-outputs-${{ matrix.os }}
-        path: ${{ runner.temp }}/build-outputs
+        name: build-outputs
+        path: ${{ runner.temp }}
         if-no-files-found: error
